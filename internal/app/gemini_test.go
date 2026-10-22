@@ -95,6 +95,21 @@ func TestEmptyFrameDetection(t *testing.T) {
 	}
 }
 
+// 抓包里真实的视频生成受理响应（inner[2] 结构）：
+const videoAcceptedRaw = ")]}'\n\n405\n" +
+	`[["wrb.fr",null,"[null,[\"c_009dc1a8b6d334cc\",\"r_da97f5608b40a27c\"],{\"7\":[\"I'm generating your video. This could take a few minutes, so check back to see when your video is ready.\",[\"video_generation\",[null,null,\"Video Generation\",\"https://www.gstatic.com/images/branding/productlogos/gemini_2025_blue/v1/192px.svg\"],1,[null,[null,null,null,null,null,null,null,null,[1]]]]],\"44\":true}]"]]` +
+	"\n122\n" +
+	`[["wrb.fr",null,null,null,null,[13,null,[["type.googleapis.com/assistant.boq.bard.application.BardErrorInfo",[1096]]]]]]` + "\n"
+
+func TestVideoAcceptedFrameDetection(t *testing.T) {
+	if !hasContentFrame(videoAcceptedRaw) {
+		t.Errorf("视频受理响应应被判定为有效内容帧")
+	}
+	if got := extractResponseText(videoAcceptedRaw); !strings.Contains(got, "generating your video") {
+		t.Errorf("应能提取出视频受理文本, got %q", got)
+	}
+}
+
 // usage 必须跟 requests 表口径一致（都走 tiktoken），不能退回 chars/4。
 func TestUsageUsesTokenizer(t *testing.T) {
 	initTokenizer()
