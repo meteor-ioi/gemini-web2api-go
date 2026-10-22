@@ -982,7 +982,7 @@ func extractReasoning(raw string) string {
 // textsInLine 从单个 wrb.fr 行里取出候选回复文本。
 // 上游每帧带的是**累积全文**而不是增量，所以流式转发时要自己做前缀 diff。
 func textsInLine(line string) []string {
-	if !strings.Contains(line, `"wrb.fr"`) || len(line) < 200 {
+	if !strings.Contains(line, `"wrb.fr"`) || len(line) < 50 {
 		return nil
 	}
 	var arr []interface{}
@@ -994,30 +994,42 @@ func textsInLine(line string) []string {
 		return nil
 	}
 	innerStr, ok := first[2].(string)
-	if !ok || len(innerStr) < 50 {
+	if !ok || len(innerStr) < 20 {
 		return nil
 	}
 	var inner []interface{}
-	if err := json.Unmarshal([]byte(innerStr), &inner); err != nil || len(inner) <= 4 {
-		return nil
-	}
-	parts, ok := inner[4].([]interface{})
-	if !ok {
+	if err := json.Unmarshal([]byte(innerStr), &inner); err != nil || len(inner) < 2 {
 		return nil
 	}
 	var texts []string
-	for _, p := range parts {
-		pl, ok := p.([]interface{})
-		if !ok || len(pl) < 2 {
-			continue
+	if len(inner) > 4 {
+		if parts, ok := inner[4].([]interface{}); ok {
+			for _, p := range parts {
+				pl, ok := p.([]interface{})
+				if !ok || len(pl) < 2 {
+					continue
+				}
+				tl, ok := pl[1].([]interface{})
+				if !ok {
+					continue
+				}
+				for _, t := range tl {
+					if s, ok := t.(string); ok && s != "" {
+						texts = append(texts, s)
+					}
+				}
+			}
 		}
-		tl, ok := pl[1].([]interface{})
-		if !ok {
-			continue
-		}
-		for _, t := range tl {
-			if s, ok := t.(string); ok && s != "" {
-				texts = append(texts, s)
+	}
+	// 媒体/视频生成任务：上游返回格式可能为 inner[2] 的 map，如 {"7": ["I'm generating your video...", ...]}
+	if len(inner) >= 3 {
+		if m, ok := inner[2].(map[string]interface{}); ok {
+			for _, v := range m {
+				if vl, ok := v.([]interface{}); ok && len(vl) > 0 {
+					if s, ok := vl[0].(string); ok && s != "" {
+						texts = append(texts, s)
+					}
+				}
 			}
 		}
 	}
@@ -1034,6 +1046,10 @@ func hasContentFrame(raw string) bool {
 		if len(textsInLine(line)) > 0 || reasoningInLine(line) != "" {
 			return true
 		}
+	}
+	// 媒体异步任务（如视频生成）：上游已受理生成任务时可能帧结构特殊，只要含 wrb.fr 且包含会话 id 或 video_generation 标记即为有效帧
+	if strings.Contains(raw, `"wrb.fr"`) && (strings.Contains(raw, "video_generation") || strings.Contains(raw, `"c_`)) {
+		return true
 	}
 	return false
 }

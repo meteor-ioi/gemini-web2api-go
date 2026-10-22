@@ -117,9 +117,16 @@ func Run() {
 	// /v1/videos —— OpenAI(Sora) 形状的异步视频生成。POST 建任务，GET 轮询，GET .../content 下 MP4。
 	mux.HandleFunc("/v1/videos", requireAPIKey(handleCreateVideo))
 	mux.HandleFunc("/v1/videos/", requireAPIKey(handleVideoItem))
+	// /v1/music —— 异步音乐生成端点（对齐 /v1/videos 设计）。POST 建任务，GET 轮询，GET .../content 下 MP3。
+	mux.HandleFunc("/v1/music", requireAPIKey(handleCreateMusic))
+	mux.HandleFunc("/v1/music/", requireAPIKey(handleMusicItem))
 	// MCP over HTTP（Streamable HTTP）：跟 OpenAI 接口同进程同端口，暴露 web_search。
 	// 用同一把 API key 鉴权，客户端配 Authorization: Bearer <key> 连这个 URL。
 	mux.HandleFunc("/mcp", requireAPIKey(handleMCPHTTP))
+	// /v1/media/{id} —— 媒体产物直链访问（用于生图、音乐等短链托管，免鉴权以供前端/Markdown直接渲染）
+	mux.HandleFunc("/v1/media/", handleMediaGet)
+	// 儿童画板网络安全搜图 (对接必应严格安全过滤，国内高速且无需额外配置)
+	mux.HandleFunc("/v1/kids/search-images", handleKidsImageSearch)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
 			handleRoot(w, r)

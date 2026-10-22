@@ -23,7 +23,7 @@ Turn the Google Gemini web app into an OpenAI-compatible API. **Single binary**,
 - [Features](#features)
 - [Quick start](#quick-start)
 - [Connecting clients](#connecting-clients)
-- [MCP (web_search tool)](#mcp-web_search-tool)
+- [MCP Server](#mcp-server)
 - [Admin panel](#admin-panel)
 - [Models](#models)
 - [Configuration](#configuration)
@@ -217,23 +217,21 @@ Every OpenAI-compatible client (Cherry Studio / ChatBox / Open WebUI / dify / Cu
 
 There is also an unauthenticated health check at `GET /` returning `{"status":"ok","version":…,"models":[…]}`.
 
-## MCP (web_search tool)
+## MCP Server
 
 Besides the OpenAI API, the same process and port also serves an **MCP server** at `/mcp`,
-exposing Gemini's web-grounded **search** as a `web_search` tool. This lets MCP clients
-(Claude Desktop / Claude Code / Cursor) "search the web through Gemini" and get a
-**synthesized answer plus source links** back.
+exposing Gemini's core capabilities as standard MCP tools for Claude Desktop / Claude Code / Cursor / Antigravity.
 
 No separate process or deployment — running the backend gives you this. The transport is
 HTTP (Streamable HTTP), so remote clients just point at the URL, reusing the backend's
-account pool / proxy pool / rate limiting. Search works anonymously; no cookie required.
+account pool / proxy pool / rate limiting.
 
 **Client config** (Claude Desktop's `claude_desktop_config.json`):
 
 ```json
 {
   "mcpServers": {
-    "gemini-search": {
+    "gemini-mcp": {
       "url": "http://your-server:8083/mcp",
       "headers": { "Authorization": "Bearer sk-gemini-your-key" }
     }
@@ -243,11 +241,16 @@ account pool / proxy pool / rate limiting. Search works anonymously; no cookie r
 
 - `url` points at the backend's `/mcp`; locally it's `http://localhost:8083/mcp`.
 - `Authorization` is the same API key as the OpenAI endpoint (shown on the Settings page).
-- Claude Code: `claude mcp add --transport http gemini-search http://localhost:8083/mcp --header "Authorization: Bearer sk-gemini-your-key"`.
+- Claude Code: `claude mcp add --transport http gemini-mcp http://localhost:8083/mcp --header "Authorization: Bearer sk-gemini-your-key"`.
 
-The `web_search(query)` tool takes a query/question and returns Gemini's web-grounded
-answer with a `Sources:` list appended. It's the only tool for now (`url_context` — reading
-a specific URL's content — is not implemented yet).
+**Available Tools**:
+- `web_search(query)`: Gemini web search with synthesized answer and `Sources:` links list (anonymous, no cookie needed).
+- `generate_image(prompt, image_url?)`: Image generation & editing (Nano Banana engine), returns structured result and markdown presentation instructions (needs cookie).
+- `generate_music(prompt)`: Original music synchronous generation (Lyria engine, ~30s), returns direct audio URL for online playback (needs cookie).
+- `create_music_task(prompt)`: Asynchronous music generation task creation (Google DeepMind Lyria engine, recommended against Cloudflare 100s proxy timeout), returns `job_id` (needs cookie).
+- `get_music_status(job_id)`: Poll music task status and retrieve direct streaming/download URL.
+- `create_video_task(prompt, model?)`: Asynchronous video generation task creation (Google Veo engine), returns `job_id` (needs Pro cookie).
+- `get_video_status(job_id)`: Poll video task status and retrieve download URL.
 
 ## Admin panel
 

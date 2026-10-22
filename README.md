@@ -23,7 +23,7 @@
 - [功能](#功能)
 - [快速开始](#快速开始)
 - [客户端接入](#客户端接入)
-- [MCP（web_search 工具）](#mcpweb_search-工具)
+- [MCP 服务](#mcp-服务)
 - [管理面板](#管理面板)
 - [模型](#模型)
 - [配置](#配置)
@@ -214,21 +214,20 @@ OpenAI 形状的接口，没做 `/v1beta`。
 
 另有一个不鉴权的健康检查 `GET /`，返回 `{"status":"ok","version":…,"models":[…]}`，给探活用。
 
-## MCP（web_search 工具）
+## MCP 服务
 
 除了 OpenAI 接口，同一个进程、同一个端口还挂了一个 **MCP server**，在 `/mcp` 上，
-把 Gemini 网页端的**联网搜索**暴露成一个 `web_search` 工具。让 Claude Desktop /
-Claude Code / Cursor 这类 MCP 客户端能「用 Gemini 去搜网」，返回**合成答案 + 来源链接**。
+把 Gemini 网页端的核心能力暴露为标准 MCP 工具供 Claude Desktop / Claude Code / Cursor / Antigravity 等 MCP 客户端调用。
 
 不用单独起进程、不用额外部署——起了后端就有。传输是 HTTP（Streamable HTTP），
-所以远程客户端连 URL 就能用，复用后端的账号池 / 代理池 / 限流。匿名即可搜，不必挂 cookie。
+所以远程客户端连 URL 就能用，复用后端的账号池 / 代理池 / 限流。
 
 **客户端配置**（以 Claude Desktop 的 `claude_desktop_config.json` 为例）：
 
 ```json
 {
   "mcpServers": {
-    "gemini-search": {
+    "gemini-mcp": {
       "url": "http://你的服务器:8083/mcp",
       "headers": { "Authorization": "Bearer sk-gemini-你的key" }
     }
@@ -238,10 +237,16 @@ Claude Code / Cursor 这类 MCP 客户端能「用 Gemini 去搜网」，返回*
 
 - `url` 指向后端的 `/mcp`；本机跑就是 `http://localhost:8083/mcp`。
 - `Authorization` 填 OpenAI 接口那把同样的 API key（面板「设置」页里看）。
-- Claude Code：`claude mcp add --transport http gemini-search http://localhost:8083/mcp --header "Authorization: Bearer sk-gemini-你的key"`。
+- Claude Code：`claude mcp add --transport http gemini-mcp http://localhost:8083/mcp --header "Authorization: Bearer sk-gemini-你的key"`。
 
-工具 `web_search(query)`：传一个查询/问题，返回 Gemini 联网查证后的答案，末尾附
-`Sources:` 来源清单。当前只有这一个工具（读取指定 URL 的 `url_context` 暂未做）。
+**暴露工具列表**：
+- `web_search(query)`：Gemini 联网查证，返回综合答案及 `Sources:` 来源清单（无需 Cookie）。
+- `generate_image(prompt, image_url?)`：生图与图生图（Nano Banana 引擎），返回结构化结果与 Markdown 呈现引导（需 Cookie）。
+- `generate_music(prompt)`：原创音乐同步生成（Lyria 引擎，约 30 秒），返回在线试听与下载短链接（需 Cookie）。
+- `create_music_task(prompt)`：创建异步音乐生成任务（Google DeepMind Lyria 引擎，防 Cloudflare 100s 超时推荐），返回 `job_id`（需 Cookie）。
+- `get_music_status(job_id)`：轮询音乐生成状态及获取在线试听/下载直链。
+- `create_video_task(prompt, model?)`：创建异步视频生成任务（Google Veo 引擎），返回 `job_id`（需 Pro Cookie）。
+- `get_video_status(job_id)`：轮询视频生成状态及获取下载链接。
 
 ## 管理面板
 

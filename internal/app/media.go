@@ -131,8 +131,8 @@ func fetchMediaArtifacts(tool int, raw, cid, cookie, sapisid, xsrf, proxyURL, de
 	if tool == toolImage {
 		return fetchImageArtifacts(raw, cid, cookie, sapisid, xsrf, proxyURL, defaultMime)
 	}
-	// 音乐几乎立刻就绪，视频要生成几十秒到几分钟，所以视频轮询给足预算。
-	maxPolls, interval := 6, 2*time.Second
+	// 音乐通常需要 15~40 秒就绪，视频要生成几十秒到几分钟，所以给足轮询预算。
+	maxPolls, interval := 28, 2*time.Second
 	if tool == toolVideo {
 		maxPolls, interval = 45, 8*time.Second // 约 6 分钟
 	}
@@ -182,6 +182,12 @@ func fetchImageArtifacts(raw, cid, cookie, sapisid, xsrf, proxyURL, defaultMime 
 		// 免得客户端拿到几张一模一样的图。
 		if !artifactSeen(arts, data) {
 			arts = append(arts, MediaArtifact{Mime: mime, Data: data})
+		}
+		// 性能优化：上游一次会挂多个候选下载链（通常 2~3 个），
+		// 上层消费只取第一份产物。串行下载全部候选会导致总耗时突破 60s 触发客户端超时 (signal timed out)。
+		// 只要取到第一份有效产物，立即返回，将响应速度提升 2~3 倍。
+		if len(arts) >= 1 {
+			break
 		}
 	}
 	return arts, nil
@@ -246,6 +252,12 @@ func fetchDownloadArtifacts(cid, cookie, sapisid, xsrf, proxyURL, defaultMime st
 		}
 		if !artifactSeen(arts, data) {
 			arts = append(arts, MediaArtifact{Mime: mime, Data: data})
+		}
+		// 性能优化：上游一次会挂多个候选下载链（通常 2~3 个），
+		// 上层消费只取第一份产物。串行下载全部候选会导致总耗时突破 60s 触发客户端超时 (signal timed out)。
+		// 只要取到第一份有效产物，立即返回，将响应速度提升 2~3 倍。
+		if len(arts) >= 1 {
+			break
 		}
 	}
 	return arts, nil

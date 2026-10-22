@@ -1,0 +1,1849 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doska Kanban · 项目开发进度看板</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Marked Markdown 解析器 -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- Lucide 图标库 (现代矢量图标) -->
+  <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+  <!-- Geist-Neutral V2 极简黑白灰设计系统 Tailwind 映射配置 -->
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            bg: 'var(--bg)',
+            surface: 'var(--surface)',
+            'surface-2': 'var(--surface-2)',
+            'surface-hover': 'var(--surface-hover)',
+            'surface-active': 'var(--surface-active)',
+            border: 'var(--border)',
+            'border-strong': 'var(--border-strong)',
+            text: 'var(--text)',
+            'text-dim': 'var(--text-dim)',
+            'text-mute': 'var(--text-mute)',
+            primary: {
+              DEFAULT: 'var(--primary)',
+              soft: 'var(--primary-soft)'
+            },
+            accent: 'var(--accent)',
+            danger: {
+              DEFAULT: 'var(--danger)',
+              soft: 'var(--danger-soft)'
+            }
+          },
+          borderRadius: {
+            sm: 'var(--radius-sm)',
+            md: 'var(--radius-md)',
+            lg: 'var(--radius-lg)'
+          },
+          boxShadow: {
+            sm: 'var(--shadow-sm)',
+            md: 'var(--shadow-md)',
+            lg: 'var(--shadow-lg)'
+          },
+          transitionDuration: {
+            120: '120ms'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* =========================================================
+       Geist-Neutral V2 核心色彩与样式 Token (双色温)
+       ========================================================= */
+    :root {
+      /* 基础画布 */
+      --bg: hsl(0 0% 100%);              /* 主背景 */
+      --surface: hsl(0 0% 100%);         /* 卡片/面板底色 */
+      --surface-2: hsl(0 0% 98%);        /* 沉降面背景 (输入框、代码块) */
+      --surface-hover: hsl(0 0% 95%);    /* hover 态底色 */
+      --surface-active: hsl(0 0% 92%);   /* active 态激活底色 */
+
+      /* 边框与分割线 */
+      --border: hsl(0 0% 92%);            /* 区域分割细线 */
+      --border-strong: hsl(0 0% 79%);     /* 强边框 (输入框边框、Checkbox) */
+
+      /* 文本梯度 */
+      --text: hsl(0 0% 9%);               /* 主文本色 */
+      --text-dim: hsl(0 0% 30%);          /* 次要说明文字 */
+      --text-mute: hsl(0 0% 56%);         /* 占位符、时间戳、禁用文字 */
+
+      /* 核心动作与状态 (Vercel 蓝做极克制点缀) */
+      --primary: hsl(212 100% 48%);
+      --primary-soft: rgba(0, 114, 245, 0.08);
+      --accent: var(--text);              /* 经典中性反转色（主按钮色） */
+      --danger: #b91c1c;
+      --danger-soft: rgba(185, 28, 28, 0.08);
+
+      /* 投影与深度（统一带 1px 描边） */
+      --shadow-sm: 0 0 0 1px rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.05);
+      --shadow-lg: 0 0 0 1px rgba(0, 0, 0, 0.10), 0 12px 40px rgba(0, 0, 0, 0.12);
+
+      /* 圆角级配 */
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+
+      /* 滚动条 */
+      --scrollbar-thumb: hsl(0 0% 82%);
+      --scrollbar-hover: hsl(0 0% 65%);
+    }
+
+    /* 适配 Dark 模式: 支持 .theme-dark 和 html.dark */
+    :root.theme-dark, html.dark {
+      --bg: hsl(0 0% 4%);                 /* ds-background-100 dark = #0a0a0a */
+      --surface: hsl(0 0% 4%);
+      --surface-2: hsl(0 0% 0%);          /* 纯黑沉降 */
+      --surface-hover: hsl(0 0% 10%);
+      --surface-active: hsl(0 0% 12%);
+      --border: hsl(0 0% 16%);
+      --border-strong: hsl(0 0% 27%);
+      --text: hsl(0 0% 93%);
+      --text-dim: hsl(0 0% 63%);
+      --text-mute: hsl(0 0% 53%);
+      --primary: hsl(210 100% 66%);
+      --primary-soft: rgba(107, 175, 255, 0.15);
+      --accent: var(--text);
+      --danger: #f87171;
+      --danger-soft: rgba(248, 113, 113, 0.14);
+      --shadow-sm: 0 0 0 1px rgba(255, 255, 255, 0.08);
+      --shadow-md: 0 0 0 1px rgba(255, 255, 255, 0.10), 0 4px 12px rgba(0, 0, 0, 0.4);
+      --shadow-lg: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 12px 40px rgba(0, 0, 0, 0.6);
+
+      --scrollbar-thumb: hsl(0 0% 20%);
+      --scrollbar-hover: hsl(0 0% 30%);
+    }
+
+    /* 滚动条规范: 限制在 5px 以内 */
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--scrollbar-hover);
+    }
+
+    /* 拖拽进入列高亮 */
+    .drag-over-col {
+      background-color: var(--surface-hover) !important;
+      box-shadow: inset 0 0 0 1px var(--primary) !important;
+    }
+    .card-ghost {
+      opacity: 0.3;
+      transform: scale(0.98);
+    }
+
+    /* 抽屉视窗模式：居中沉浸模态 (Modal 模式) */
+    #cardDrawer.drawer-mode-modal {
+      right: 50% !important;
+      top: 50% !important;
+      bottom: auto !important;
+      left: auto !important;
+      transform: translate(50%, -50%) !important;
+      width: 920px !important;
+      max-width: calc(100vw - 32px) !important;
+      height: 88vh !important;
+      border-radius: var(--radius-lg) !important;
+      border: 1px solid var(--border) !important;
+      box-shadow: 0 0 0 1px var(--border), 0 24px 60px -12px rgba(0, 0, 0, 0.45) !important;
+    }
+    #cardDrawer.drawer-mode-modal.translate-x-full {
+      transform: translate(50%, calc(-50% + 20px)) scale(0.98) !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+
+    /* 抽屉内 Markdown 排版引擎规范 (彻底杜绝 flex 造成的嵌套列表挤压崩溃) */
+    .prose-geist {
+      font-size: 0.825rem;
+      line-height: 1.65;
+      color: var(--text-dim);
+      word-break: break-word;
+    }
+    .prose-geist h1 { font-size: 1.2rem; font-weight: 600; margin: 1rem 0 0.6rem 0; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 0.35rem; }
+    .prose-geist h2 { font-size: 1.05rem; font-weight: 600; margin: 1rem 0 0.5rem 0; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 0.25rem; }
+    .prose-geist h3 { font-size: 0.92rem; font-weight: 600; margin: 0.85rem 0 0.4rem 0; color: var(--text); }
+    .prose-geist h4 { font-size: 0.85rem; font-weight: 600; margin: 0.75rem 0 0.35rem 0; color: var(--text-dim); }
+    .prose-geist p { margin-bottom: 0.75rem; color: var(--text-dim); font-size: 0.825rem; line-height: 1.65; }
+    
+    /* 基础列表与多级嵌套缩进 */
+    .prose-geist ul { list-style-type: disc; padding-left: 1.25rem; margin-bottom: 0.75rem; }
+    .prose-geist ol { list-style-type: decimal; padding-left: 1.25rem; margin-bottom: 0.75rem; }
+    .prose-geist ul ul, .prose-geist ol ol, .prose-geist ul ol, .prose-geist ol ul { 
+      margin-top: 0.25rem; 
+      margin-bottom: 0.25rem; 
+      padding-left: 1.25rem; 
+    }
+    .prose-geist li { 
+      font-size: 0.825rem; 
+      color: var(--text-dim); 
+      margin-bottom: 0.35rem; 
+      line-height: 1.6; 
+    }
+
+    /* Checklist 任务清单专项排版：绝对对齐 + 保护自然块级流 */
+    .prose-geist ul:has(> li > input[type="checkbox"]) {
+      list-style: none;
+      padding-left: 0;
+    }
+    .prose-geist li:has(> input[type="checkbox"]) {
+      list-style: none;
+      position: relative;
+      padding-left: 1.45rem;
+      margin-bottom: 0.45rem;
+    }
+    .prose-geist li > input[type="checkbox"] {
+      position: absolute;
+      left: 0;
+      top: 0.25rem;
+      margin: 0;
+    }
+    .prose-geist li.is-done > span.task-text {
+      text-decoration: line-through;
+      color: var(--text-mute);
+    }
+
+    /* 代码块与行内代码 */
+    .prose-geist pre {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.75rem 1rem;
+      overflow-x: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.78rem;
+      line-height: 1.55;
+      margin: 0.6rem 0 0.85rem 0;
+    }
+    .prose-geist pre code {
+      background: transparent;
+      border: none;
+      padding: 0;
+      color: var(--text);
+      font-size: inherit;
+    }
+    .prose-geist code {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      padding: 0.12rem 0.35rem;
+      border-radius: 4px;
+      font-size: 0.76rem;
+      color: var(--primary);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    /* 引用块 */
+    .prose-geist blockquote {
+      border-left: 3px solid var(--border-strong);
+      padding-left: 0.85rem;
+      margin: 0.75rem 0;
+      color: var(--text-mute);
+      font-style: italic;
+    }
+
+    /* 表格完整支持 */
+    .prose-geist table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0.85rem 0;
+      font-size: 0.78rem;
+      border: 1px solid var(--border);
+    }
+    .prose-geist th, .prose-geist td {
+      border: 1px solid var(--border);
+      padding: 0.45rem 0.65rem;
+      text-align: left;
+    }
+    .prose-geist th {
+      background: var(--surface-2);
+      font-weight: 600;
+      color: var(--text);
+    }
+    .prose-geist tr:nth-child(even) {
+      background: var(--surface-hover);
+    }
+
+    /* 分割线与超链接 */
+    .prose-geist hr {
+      border: 0;
+      border-top: 1px solid var(--border);
+      margin: 1.25rem 0;
+    }
+    .prose-geist a {
+      color: var(--primary);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      transition: opacity 0.12s;
+    }
+    .prose-geist a:hover {
+      opacity: 0.8;
+    }
+    .prose-geist strong { color: var(--text); font-weight: 600; }
+  </style>
+</head>
+<body class="bg-bg text-text font-sans h-screen flex flex-col overflow-hidden select-none transition-colors duration-150">
+
+  <!-- 顶部主导航栏 (方案 B 规范：48~56px，1px 细边框，线条分区) -->
+  <header class="h-12 border-b border-border bg-surface px-4 flex items-center justify-between shrink-0 z-20">
+    <div class="flex items-center gap-2.5">
+      <!-- 侧边栏折叠切换按钮 -->
+      <button id="toggleSidebarBtn" class="w-8 h-8 rounded-md hover:bg-surface-hover text-text-dim hover:text-text flex items-center justify-center transition duration-120" title="切换侧边栏">
+        <i data-lucide="panel-left-close" class="w-4 h-4"></i>
+      </button>
+
+      <!-- Logo & 目录胶囊 (去除冗余文字标题，留白呼吸) -->
+      <div class="flex items-center gap-2">
+        <div class="w-7 h-7 rounded-sm bg-surface-2 border border-border flex items-center justify-center text-text shadow-sm">
+          <i data-lucide="kanban-square" class="w-3.5 h-3.5"></i>
+        </div>
+        <div class="flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-sm bg-surface-2 text-text-dim border border-border font-mono">
+          <i data-lucide="folder" class="w-3 h-3 text-text-mute"></i>
+          <span id="boardPathBadge">kanban/</span>
+        </div>
+      </div>
+
+      <!-- 进度指示器 (Geist 极简中性，tabular-nums 数字对齐) -->
+      <div class="hidden sm:flex items-center gap-2 ml-2 px-2.5 py-0.5 bg-surface-2 rounded-sm border border-border text-xs tabular-nums">
+        <span class="text-text-mute text-[11px]">进度</span>
+        <div class="w-16 h-1.5 bg-border rounded-full overflow-hidden">
+          <div id="topProgressBar" class="h-full bg-accent rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+        <span id="topProgressText" class="font-mono text-text font-semibold text-xs">0%</span>
+        <span id="topProgressDetail" class="text-text-mute text-[11px]">(0/0)</span>
+      </div>
+    </div>
+
+    <!-- 中部：快速搜索 (常规态表面2，聚焦态强边框+微弱外发光) -->
+    <div class="flex-1 max-w-sm mx-4 hidden md:block">
+      <div class="relative">
+        <i data-lucide="search" class="w-3.5 h-3.5 text-text-mute absolute left-2.5 top-1/2 -translate-y-1/2"></i>
+        <input 
+          id="searchInput" 
+          type="text" 
+          placeholder="搜索卡片、Checklist 或正文... (/)" 
+          class="w-full h-7 bg-surface-2 border border-transparent focus:border-border-strong focus:bg-surface rounded-md pl-8 pr-7 text-xs text-text placeholder-text-mute focus:outline-none focus:ring-1 focus:ring-primary-soft transition duration-120"
+        >
+        <button id="clearSearchBtn" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-text-mute hover:text-text">
+          <i data-lucide="x" class="w-3 h-3"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- 右侧：动作控制组 (中性按钮体系) -->
+    <div class="flex items-center gap-1.5">
+      <!-- 主题切换按钮 -->
+      <button id="themeToggleBtn" class="w-8 h-8 rounded-md hover:bg-surface-hover text-text-dim hover:text-text flex items-center justify-center transition duration-120" title="主题模式 (默认跟随系统)">
+        <i data-lucide="monitor" class="w-4 h-4" id="themeIcon"></i>
+      </button>
+
+      <!-- 重新载入 -->
+      <button id="refreshBtn" class="w-8 h-8 rounded-md hover:bg-surface-hover text-text-dim hover:text-text flex items-center justify-center transition duration-120" title="重新载入本地卡片">
+        <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+      </button>
+
+      <!-- 授权同步更新按钮 (次要按钮规范：border-border bg-surface text-text hover:bg-surface-hover) -->
+      <button id="authSyncBtn" class="flex items-center gap-1.5 h-7 px-2.5 rounded-sm border border-border bg-surface text-xs font-medium text-text hover:bg-surface-hover transition duration-120 shadow-sm" title="点击授权浏览器读写本地 kanban 目录，开启实时双向同步">
+        <i data-lucide="shield-check" class="w-3.5 h-3.5 text-text-mute" id="authSyncIcon"></i>
+        <span id="authSyncText">授权同步更新</span>
+      </button>
+
+      <!-- 新建任务卡片 (主按钮规范：Geist 中性反转色 bg-accent text-bg hover:opacity-90) -->
+      <button id="newCardBtn" class="flex items-center gap-1.5 h-7 px-3 rounded-sm bg-accent text-bg font-medium text-xs hover:opacity-90 transition duration-120 shadow-sm">
+        <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+        <span>新建任务</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- 主体工作区 (方案 B 规范：Sidebar 240px + Main Content 网格拉伸) -->
+  <div class="flex-1 flex min-h-0 relative overflow-hidden">
+    
+    <!-- 左侧固定 240px 侧边栏 (AppSidebar) -->
+    <aside id="appSidebar" class="w-60 border-r border-border bg-surface flex flex-col shrink-0 transition-all duration-150 ease-in-out">
+      <div class="p-3 flex-1 overflow-y-auto space-y-4">
+        <!-- 视图分栏 -->
+        <div>
+          <div class="text-[11px] uppercase tracking-wider text-text-mute font-semibold px-2 mb-1 flex items-center gap-1.5">
+            <i data-lucide="layout-grid" class="w-3 h-3"></i>
+            <span>主视图</span>
+          </div>
+          <div class="space-y-0.5 text-xs">
+            <button class="filter-view-btn w-full flex items-center justify-between px-2 py-1.5 rounded-sm bg-surface-hover text-text font-medium border border-border transition duration-120" data-view="all">
+              <div class="flex items-center gap-2">
+                <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-primary"></i>
+                <span>看板全景</span>
+              </div>
+              <span id="sidebarTotalCount" class="text-[11px] text-text-mute font-mono tabular-nums">0</span>
+            </button>
+            <button class="filter-view-btn w-full flex items-center justify-between px-2 py-1.5 rounded-sm text-text-dim hover:bg-surface-hover hover:text-text transition duration-120" data-view="in_progress">
+              <div class="flex items-center gap-2">
+                <i data-lucide="flame" class="w-3.5 h-3.5 text-primary"></i>
+                <span>正在进行</span>
+              </div>
+              <span id="sidebarInProgressCount" class="text-[11px] text-text-mute font-mono tabular-nums">0</span>
+            </button>
+            <button class="filter-view-btn w-full flex items-center justify-between px-2 py-1.5 rounded-sm text-text-dim hover:bg-surface-hover hover:text-text transition duration-120" data-view="todo">
+              <div class="flex items-center gap-2">
+                <i data-lucide="clock" class="w-3.5 h-3.5 text-text-mute"></i>
+                <span>待办开发</span>
+              </div>
+              <span id="sidebarTodoCount" class="text-[11px] text-text-mute font-mono tabular-nums">0</span>
+            </button>
+            <button class="filter-view-btn w-full flex items-center justify-between px-2 py-1.5 rounded-sm text-text-dim hover:bg-surface-hover hover:text-text transition duration-120" data-view="done">
+              <div class="flex items-center gap-2">
+                <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-text-mute"></i>
+                <span>已完成验收</span>
+              </div>
+              <span id="sidebarDoneCount" class="text-[11px] text-text-mute font-mono tabular-nums">0</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 优先级筛选 -->
+        <div>
+          <div class="text-[11px] uppercase tracking-wider text-text-mute font-semibold px-2 mb-1 flex items-center gap-1.5">
+            <i data-lucide="flag" class="w-3 h-3"></i>
+            <span>优先级过滤</span>
+          </div>
+          <div class="space-y-0.5 text-xs">
+            <button class="filter-priority-btn w-full flex items-center justify-between px-2 py-1 rounded-sm text-text-dim hover:bg-surface-hover hover:text-text transition duration-120" data-prio="high">
+              <div class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-danger"></span>
+                <span>高优先级 (High)</span>
+              </div>
+              <span id="prioHighCount" class="text-[10px] text-text-mute font-mono tabular-nums">0</span>
+            </button>
+            <button class="filter-priority-btn w-full flex items-center justify-between px-2 py-1 rounded-sm text-text-dim hover:bg-surface-hover hover:text-text transition duration-120" data-prio="medium">
+              <div class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-text-dim"></span>
+                <span>中优先级 (Medium)</span>
+              </div>
+              <span id="prioMedCount" class="text-[10px] text-text-mute font-mono tabular-nums">0</span>
+            </button>
+            <button class="filter-priority-btn w-full flex items-center justify-between px-2 py-1 rounded-sm text-text-dim hover:bg-surface-hover hover:text-text transition duration-120" data-prio="low">
+              <div class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-text-mute"></span>
+                <span>低优先级 (Low)</span>
+              </div>
+              <span id="prioLowCount" class="text-[10px] text-text-mute font-mono tabular-nums">0</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 标签 Tags 聚合池 -->
+        <div>
+          <div class="text-[11px] uppercase tracking-wider text-text-mute font-semibold px-2 mb-1 flex items-center gap-1.5">
+            <i data-lucide="tags" class="w-3 h-3"></i>
+            <span>标签池 (Tags)</span>
+          </div>
+          <div id="sidebarTagsList" class="flex flex-wrap gap-1 px-1 pt-0.5">
+            <span class="text-xs text-text-mute">暂无标签</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部同步状态与主题 -->
+      <div class="p-2.5 border-t border-border text-[11px] text-text-dim flex items-center justify-between bg-surface">
+        <div class="flex items-center gap-1.5">
+          <i data-lucide="check-circle" class="w-3.5 h-3.5 text-text-dim"></i>
+          <span id="syncStatusText">本地目录就绪</span>
+        </div>
+        <div class="flex items-center gap-1 text-[10px] text-text-mute font-mono">
+          <span id="currentThemeTag">系统主题</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 中部：看板主视图 (Deck View) -->
+    <main class="flex-1 min-w-0 bg-bg overflow-x-auto overflow-y-hidden flex">
+      <!-- 泳道横向容器：mx-auto 实现空间富余时整体画面居中，空间不足时平滑横向滚动 -->
+      <div id="deckContainer" class="h-full p-3.5 flex gap-3 min-w-fit mx-auto transition-all duration-150">
+        <!-- 4 列泳道由 JavaScript 动态组装 -->
+      </div>
+    </main>
+
+    <!-- 右侧：卡片详情抽屉 (CardPanel - 宽适自适应 / 支持侧边与居中大模态双形态) -->
+    <aside id="cardDrawer" class="fixed inset-y-0 right-0 w-full sm:w-[680px] lg:w-[780px] xl:w-[840px] max-w-[95vw] bg-surface border-l border-border shadow-lg z-40 transform translate-x-full transition-all duration-150 ease-in-out flex flex-col">
+      <!-- 抽屉顶部栏 (支持双击快速切换 侧边抽屉 / 居中宽屏模态) -->
+      <div id="drawerHeaderBar" class="h-12 border-b border-border px-4 flex items-center justify-between shrink-0 bg-surface cursor-pointer select-none" title="双击可在侧边抽屉与居中大模态之间切换">
+        <div class="flex items-center gap-2">
+          <i data-lucide="git-pull-request" class="w-4 h-4 text-primary"></i>
+          <span class="text-xs font-semibold uppercase tracking-wider text-text-dim" id="drawerColName">02_To_Do</span>
+        </div>
+        <div class="flex items-center gap-1" onclick="event.stopPropagation()">
+          <!-- 切换视图模式：预览 / 编辑 -->
+          <button id="drawerToggleModeBtn" class="h-7 px-2.5 rounded-sm text-xs font-medium text-text bg-surface-2 hover:bg-surface-hover border border-border flex items-center gap-1.5 transition duration-120">
+            <i data-lucide="code-2" class="w-3.5 h-3.5 text-primary" id="drawerModeIcon"></i>
+            <span id="drawerModeText">编辑源码</span>
+          </button>
+          <!-- 切换视窗模式：侧边抽屉 / 居中大模态 -->
+          <button id="drawerExpandBtn" class="w-7 h-7 rounded-sm text-text-mute hover:text-text hover:bg-surface-hover flex items-center justify-center transition duration-120" title="在侧边抽屉与居中宽屏之间切换">
+            <i data-lucide="maximize-2" class="w-3.5 h-3.5" id="drawerExpandIcon"></i>
+          </button>
+          <!-- 移至废纸篓 -->
+          <button id="drawerDeleteBtn" class="w-7 h-7 rounded-sm text-text-mute hover:text-danger hover:bg-danger-soft flex items-center justify-center transition duration-120" title="移至废纸篓">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          </button>
+          <!-- 关闭抽屉 -->
+          <button id="drawerCloseBtn" class="w-7 h-7 rounded-sm text-text-mute hover:text-text hover:bg-surface-hover flex items-center justify-center transition duration-120" title="关闭 (Esc)">
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- 抽屉元数据配置面板 (沉降面 surface-2) -->
+      <div class="p-3.5 border-b border-border space-y-3 bg-surface-2 shrink-0">
+        <!-- 标题输入框 -->
+        <input 
+          id="drawerTitleInput" 
+          type="text" 
+          placeholder="卡片标题..." 
+          class="w-full text-sm font-semibold text-text bg-transparent border-b border-transparent hover:border-border focus:border-border-strong focus:outline-none pb-1 transition duration-120"
+        >
+
+        <!-- 4 项属性网格 -->
+        <div class="grid grid-cols-2 gap-2.5 text-xs">
+          <!-- 状态列 -->
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] text-text-mute flex items-center gap-1">
+              <i data-lucide="columns-3" class="w-3 h-3 text-text-mute"></i>
+              <span>所属列状态</span>
+            </label>
+            <select id="drawerColSelect" class="h-7 bg-surface border border-border rounded-sm px-2 text-text focus:outline-none focus:border-border-strong text-xs">
+              <option value="01_Backlog">01_Backlog (需求池)</option>
+              <option value="02_To_Do">02_To_Do (待办)</option>
+              <option value="03_In_Progress">03_In_Progress (进行中)</option>
+              <option value="04_Done">04_Done (已完成)</option>
+            </select>
+          </div>
+
+          <!-- 优先级 -->
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] text-text-mute flex items-center gap-1">
+              <i data-lucide="flag" class="w-3 h-3 text-text-mute"></i>
+              <span>优先级</span>
+            </label>
+            <select id="drawerPrioSelect" class="h-7 bg-surface border border-border rounded-sm px-2 text-text focus:outline-none focus:border-border-strong text-xs">
+              <option value="high">🔴 高 (High)</option>
+              <option value="medium">🟡 中 (Medium)</option>
+              <option value="low">⚪ 低 (Low)</option>
+            </select>
+          </div>
+
+          <!-- 截止日期 -->
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] text-text-mute flex items-center gap-1">
+              <i data-lucide="calendar-clock" class="w-3 h-3 text-text-mute"></i>
+              <span>截止日期 (Deadline)</span>
+            </label>
+            <input type="date" id="drawerDeadInput" class="h-7 bg-surface border border-border rounded-sm px-2 text-text focus:outline-none focus:border-border-strong text-xs">
+          </div>
+
+          <!-- 标签 -->
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] text-text-mute flex items-center gap-1">
+              <i data-lucide="tags" class="w-3 h-3 text-text-mute"></i>
+              <span>标签 (逗号分隔)</span>
+            </label>
+            <input type="text" id="drawerTagsInput" placeholder="feature, parser" class="h-7 bg-surface border border-border rounded-sm px-2 text-text focus:outline-none focus:border-border-strong text-xs">
+          </div>
+        </div>
+      </div>
+
+      <!-- 抽屉正文：Markdown 交互与源码编辑双模 -->
+      <div class="flex-1 min-h-0 relative p-4 overflow-y-auto">
+        <!-- 模式 1: 交互式 Markdown 预览 -->
+        <div id="drawerPreviewPane" class="prose-geist space-y-2.5">
+          <!-- 由 marked 解析 -->
+        </div>
+
+        <!-- 模式 2: 源码编辑 Textarea (Geist 风格沉降面) -->
+        <textarea 
+          id="drawerBodyEditor" 
+          class="hidden w-full h-full bg-surface-2 border border-border rounded-md p-3 font-mono text-xs text-text focus:outline-none focus:border-border-strong resize-none leading-relaxed"
+          placeholder="编写 Markdown 正文..."
+        ></textarea>
+      </div>
+
+      <!-- 抽屉底部保存栏 -->
+      <div class="p-3 border-t border-border bg-surface flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-1.5 text-[11px] text-text-mute">
+          <i data-lucide="check-check" class="w-3.5 h-3.5 text-text-dim"></i>
+          <span id="drawerSaveTime">本地文件已就绪</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="drawerCancelBtn" class="h-7 px-2.5 rounded-sm text-xs text-text-dim hover:text-text hover:bg-surface-hover transition duration-120">取消</button>
+          <button id="drawerSaveBtn" class="flex items-center gap-1.5 h-7 px-3 rounded-sm bg-accent text-bg font-medium text-xs hover:opacity-90 transition duration-120 shadow-sm">
+            <i data-lucide="save" class="w-3.5 h-3.5"></i>
+            <span>保存修改</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 抽屉遮罩 -->
+    <div id="drawerOverlay" class="hidden fixed inset-0 bg-black/20 dark:bg-black/50 backdrop-blur-xs z-30 transition-opacity"></div>
+  </div>
+
+  <!-- 新建卡片模态框 (Modal - 12px 圆角规范) -->
+  <div id="newCardModal" class="hidden fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-surface border border-border rounded-lg p-5 shadow-lg space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="font-semibold text-sm text-text flex items-center gap-2">
+          <div class="w-6 h-6 rounded-sm bg-surface-2 border border-border flex items-center justify-center text-text">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+          </div>
+          <span>新建任务卡片</span>
+        </h3>
+        <button id="closeNewModalBtn" class="text-text-mute hover:text-text">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-text-dim mb-1 font-medium">卡片标题 *</label>
+          <input id="newCardTitle" type="text" placeholder="例如：实现导出引擎与并发测试" class="w-full h-8 bg-surface-2 border border-transparent focus:border-border-strong focus:bg-surface rounded-md px-2.5 text-text focus:outline-none transition duration-120">
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-text-dim mb-1 font-medium">目标列</label>
+            <select id="newCardCol" class="w-full h-8 bg-surface-2 border border-border rounded-md px-2 text-text focus:outline-none focus:border-border-strong text-xs">
+              <option value="02_To_Do">02_To_Do (待办)</option>
+              <option value="01_Backlog">01_Backlog (需求池)</option>
+              <option value="03_In_Progress">03_In_Progress (进行中)</option>
+              <option value="04_Done">04_Done (已完成)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-text-dim mb-1 font-medium">优先级</label>
+            <select id="newCardPrio" class="w-full h-8 bg-surface-2 border border-border rounded-md px-2 text-text focus:outline-none focus:border-border-strong text-xs">
+              <option value="high">🔴 高 (High)</option>
+              <option value="medium" selected>🟡 中 (Medium)</option>
+              <option value="low">⚪ 低 (Low)</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-text-dim mb-1 font-medium">任务目标说明</label>
+          <textarea id="newCardDesc" rows="3" placeholder="描述此任务的核心目标和预期交付成果..." class="w-full bg-surface-2 border border-transparent focus:border-border-strong focus:bg-surface rounded-md p-2.5 text-text focus:outline-none transition duration-120 resize-none"></textarea>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-border">
+        <button id="cancelNewModalBtn" class="h-7 px-2.5 rounded-sm text-xs text-text-dim hover:text-text hover:bg-surface-hover transition duration-120">取消</button>
+        <button id="submitNewCardBtn" class="flex items-center gap-1.5 h-7 px-3.5 rounded-sm bg-accent text-bg font-medium text-xs hover:opacity-90 transition duration-120 shadow-sm">
+          <i data-lucide="check" class="w-3.5 h-3.5"></i>
+          <span>立即创建</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 轻量 Toast 浮动通知组件 (Geist-Neutral 浮层 shadow-lg) -->
+  <div id="toastContainer" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-150 opacity-0 translate-y-3">
+    <div id="toastContent" class="px-3.5 py-2 rounded-md bg-surface text-text border border-border shadow-lg text-xs flex items-center gap-2 backdrop-blur-md">
+      <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-text shrink-0" id="toastIcon"></i>
+      <span id="toastMsg" class="font-medium">提示信息</span>
+    </div>
+  </div>
+
+  <!-- 业务交互与数据引擎 -->
+  <script>
+    // --- 泳道列定义 (Geist-Neutral 线条与中性分类) ---
+    const COLUMNS_DEF = [
+      { 
+        id: "01_Backlog", 
+        title: "Backlog", 
+        label: "需求池", 
+        icon: "inbox" 
+      },
+      { 
+        id: "02_To_Do", 
+        title: "To Do", 
+        label: "待办开发", 
+        icon: "list-todo" 
+      },
+      { 
+        id: "03_In_Progress", 
+        title: "In Progress", 
+        label: "正在进行", 
+        icon: "flame" 
+      },
+      { 
+        id: "04_Done", 
+        title: "Done", 
+        label: "已完成验收", 
+        icon: "shield-check" 
+      }
+    ];
+
+    let state = {
+      themePreference: localStorage.getItem("doska_theme_pref") || "system", // 'system' | 'light' | 'dark'
+      dirHandle: null,
+      useNativeFs: false,
+      cards: [],
+      activeCardId: null,
+      filterSearch: "",
+      filterPriority: null,
+      filterTag: null,
+      filterView: "all",
+      isEditingMode: false,
+      isDrawerModalMode: localStorage.getItem("doska_card_drawer_modal") === "true",
+      isServerMode: false,
+      serverVersion: null
+    };
+
+    // --- 初始化入口 ---
+    document.addEventListener("DOMContentLoaded", () => {
+      initTheme();
+      bindEvents();
+      initAppBackend();
+    });
+
+    // --- 主题控制体系 (Geist-Neutral 双色温，默认跟随系统) ---
+    function initTheme() {
+      applyTheme(state.themePreference);
+
+      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+      mediaQuery.addEventListener("change", () => {
+        if (state.themePreference === "system") {
+          applyTheme("system");
+        }
+      });
+    }
+
+    function applyTheme(pref) {
+      state.themePreference = pref;
+      localStorage.setItem("doska_theme_pref", pref);
+
+      const isSystemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      let effectiveTheme = "dark";
+      if (pref === "system") {
+        effectiveTheme = isSystemDark ? "dark" : "light";
+      } else {
+        effectiveTheme = pref;
+      }
+
+      if (effectiveTheme === "dark") {
+        document.documentElement.classList.add("dark", "theme-dark");
+      } else {
+        document.documentElement.classList.remove("dark", "theme-dark");
+      }
+
+      const themeIcon = document.getElementById("themeIcon");
+      const themeTag = document.getElementById("currentThemeTag");
+      const themeBtn = document.getElementById("themeToggleBtn");
+
+      if (pref === "system") {
+        themeIcon.setAttribute("data-lucide", "monitor");
+        themeBtn.title = `当前: 跟随系统 (${effectiveTheme === 'dark' ? '深色' : '浅色'})`;
+        themeTag.innerText = `系统 (${effectiveTheme === 'dark' ? '深色' : '浅色'})`;
+      } else if (pref === "light") {
+        themeIcon.setAttribute("data-lucide", "sun");
+        themeBtn.title = "当前: 浅色白天模式 (点击切为深色)";
+        themeTag.innerText = "白天模式";
+      } else {
+        themeIcon.setAttribute("data-lucide", "moon");
+        themeBtn.title = "当前: 深色暗黑模式 (点击切为跟随系统)";
+        themeTag.innerText = "暗黑模式";
+      }
+
+      lucide.createIcons();
+    }
+
+    function cycleTheme() {
+      if (state.themePreference === "system") {
+        applyTheme("light");
+      } else if (state.themePreference === "light") {
+        applyTheme("dark");
+      } else {
+        applyTheme("system");
+      }
+    }
+
+    // --- 事件绑定 ---
+    function bindEvents() {
+      document.getElementById("themeToggleBtn").addEventListener("click", cycleTheme);
+
+      document.getElementById("toggleSidebarBtn").addEventListener("click", () => {
+        const sidebar = document.getElementById("appSidebar");
+        sidebar.classList.toggle("-ml-60");
+      });
+
+      const searchInput = document.getElementById("searchInput");
+      const clearSearchBtn = document.getElementById("clearSearchBtn");
+      searchInput.addEventListener("input", (e) => {
+        state.filterSearch = e.target.value.trim().toLowerCase();
+        clearSearchBtn.classList.toggle("hidden", !state.filterSearch);
+        renderDeck();
+      });
+      clearSearchBtn.addEventListener("click", () => {
+        searchInput.value = "";
+        state.filterSearch = "";
+        clearSearchBtn.classList.add("hidden");
+        renderDeck();
+      });
+
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "/" && document.activeElement !== searchInput) {
+          e.preventDefault();
+          searchInput.focus();
+        }
+        if (e.key === "Escape") {
+          closeDrawer();
+          closeNewModal();
+        }
+      });
+
+      document.getElementById("authSyncBtn").addEventListener("click", handleAuthSync);
+
+      document.getElementById("refreshBtn").addEventListener("click", async () => {
+        if (state.isServerMode) {
+          try {
+            const res = await fetch("/api/cards", { cache: "no-store" });
+            if (res.ok) {
+              const data = await res.json();
+              state.cards = data.cards || [];
+              state.serverVersion = data.version;
+              renderAll();
+              showToast("已从本地微服务重新载入全量卡片");
+            }
+          } catch (_) {}
+        } else if (state.dirHandle) {
+          readFromDirectoryHandle(state.dirHandle);
+        } else {
+          loadInitialData();
+        }
+      });
+
+      document.querySelectorAll(".filter-view-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".filter-view-btn").forEach(b => {
+            b.classList.remove("bg-surface-hover", "text-text", "border", "border-border");
+            b.classList.add("text-text-dim");
+          });
+          btn.classList.add("bg-surface-hover", "text-text", "border", "border-border");
+          btn.classList.remove("text-text-dim");
+          state.filterView = btn.dataset.view;
+          renderDeck();
+        });
+      });
+
+      document.querySelectorAll(".filter-priority-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const prio = btn.dataset.prio;
+          if (state.filterPriority === prio) {
+            state.filterPriority = null;
+            btn.classList.remove("bg-surface-hover", "text-text");
+            btn.classList.add("text-text-dim");
+          } else {
+            document.querySelectorAll(".filter-priority-btn").forEach(b => {
+              b.classList.remove("bg-surface-hover", "text-text");
+              b.classList.add("text-text-dim");
+            });
+            state.filterPriority = prio;
+            btn.classList.add("bg-surface-hover", "text-text");
+            btn.classList.remove("text-text-dim");
+          }
+          renderDeck();
+        });
+      });
+
+      document.getElementById("drawerCloseBtn").addEventListener("click", closeDrawer);
+      document.getElementById("drawerCancelBtn").addEventListener("click", closeDrawer);
+      document.getElementById("drawerOverlay").addEventListener("click", closeDrawer);
+      document.getElementById("drawerSaveBtn").addEventListener("click", saveActiveCard);
+      document.getElementById("drawerDeleteBtn").addEventListener("click", deleteActiveCard);
+
+      document.getElementById("drawerToggleModeBtn").addEventListener("click", () => {
+        state.isEditingMode = !state.isEditingMode;
+        updateDrawerModeDisplay();
+      });
+
+      document.getElementById("drawerExpandBtn").addEventListener("click", toggleDrawerModalMode);
+      document.getElementById("drawerHeaderBar").addEventListener("dblclick", toggleDrawerModalMode);
+
+      document.getElementById("newCardBtn").addEventListener("click", openNewModal);
+      document.getElementById("closeNewModalBtn").addEventListener("click", closeNewModal);
+      document.getElementById("cancelNewModalBtn").addEventListener("click", closeNewModal);
+      document.getElementById("submitNewCardBtn").addEventListener("click", submitNewCard);
+    }
+
+    // --- IndexedDB 目录句柄持久化与授权管理 ---
+    const DB_NAME = "DoskaKanbanDB";
+    const STORE_NAME = "handles";
+
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, 1);
+        request.onupgradeneeded = (e) => {
+          e.target.result.createObjectStore(STORE_NAME);
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function saveDirHandle(handle) {
+      try {
+        const db = await openDB();
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        tx.objectStore(STORE_NAME).put(handle, "kanban_dir");
+      } catch (e) {
+        console.warn("存储目录句柄失败:", e);
+      }
+    }
+
+    async function getSavedDirHandle() {
+      try {
+        const db = await openDB();
+        const tx = db.transaction(STORE_NAME, "readonly");
+        return new Promise((resolve) => {
+          const req = tx.objectStore(STORE_NAME).get("kanban_dir");
+          req.onsuccess = () => resolve(req.result || null);
+          req.onerror = () => resolve(null);
+        });
+      } catch (e) {
+        return null;
+      }
+    }
+
+    let toastTimer = null;
+    function showToast(msg, type = "success") {
+      const container = document.getElementById("toastContainer");
+      const icon = document.getElementById("toastIcon");
+      const text = document.getElementById("toastMsg");
+
+      if (type === "success") {
+        icon.setAttribute("data-lucide", "check-circle-2");
+        icon.className = "w-3.5 h-3.5 text-text shrink-0";
+      } else {
+        icon.setAttribute("data-lucide", "alert-triangle");
+        icon.className = "w-3.5 h-3.5 text-danger shrink-0";
+      }
+
+      text.innerText = msg;
+      lucide.createIcons();
+
+      container.classList.remove("opacity-0", "translate-y-3");
+      container.classList.add("opacity-100", "translate-y-0");
+
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        container.classList.remove("opacity-100", "translate-y-0");
+        container.classList.add("opacity-0", "translate-y-3");
+      }, 2500);
+    }
+
+    function updateAuthBtnStatus(isAuthed, dirName = "kanban") {
+      const btn = document.getElementById("authSyncBtn");
+      const text = document.getElementById("authSyncText");
+      const icon = document.getElementById("authSyncIcon");
+      const badge = document.getElementById("boardPathBadge");
+      const syncStatusText = document.getElementById("syncStatusText");
+
+      badge.innerText = `${dirName}/`;
+
+      if (isAuthed) {
+        btn.className = "flex items-center gap-1.5 h-7 px-2.5 rounded-sm border border-border-strong bg-surface-2 text-xs font-medium text-text hover:bg-surface-hover transition duration-120 shadow-sm";
+        icon.setAttribute("data-lucide", "check-circle-2");
+        icon.className = "w-3.5 h-3.5 text-text";
+        text.innerText = `已同步更新 (${dirName})`;
+        btn.title = "已开启本地实时双向同步 (点击可切换目录或重新扫描)";
+        syncStatusText.innerText = `已连接本地 (${dirName})`;
+      } else {
+        btn.className = "flex items-center gap-1.5 h-7 px-2.5 rounded-sm border border-border bg-surface text-xs font-medium text-text hover:bg-surface-hover transition duration-120 shadow-sm";
+        icon.setAttribute("data-lucide", "shield-check");
+        icon.className = "w-3.5 h-3.5 text-text-mute";
+        text.innerText = "授权同步更新";
+        btn.title = "点击授权浏览器读写本地 kanban 目录，开启实时双向同步";
+        syncStatusText.innerText = "本地待授权同步";
+      }
+      lucide.createIcons();
+    }
+
+    async function tryAutoRestoreHandle() {
+      const handle = await getSavedDirHandle();
+      if (handle) {
+        state.dirHandle = handle;
+        try {
+          const perm = await handle.queryPermission({ mode: "readwrite" });
+          if (perm === "granted") {
+            state.useNativeFs = true;
+            await readFromDirectoryHandle(handle);
+            updateAuthBtnStatus(true, handle.name);
+            return;
+          }
+        } catch (e) {
+          console.warn("探测目录句柄失败:", e);
+        }
+        updateAuthBtnStatus(false, handle.name);
+      }
+    }
+
+    async function handleAuthSync() {
+      if (!window.showDirectoryPicker) {
+        alert("您的浏览器不支持直接读写本地文件系统。建议使用最新版本的 Chrome、Edge 或 Chromium 系列浏览器。");
+        return;
+      }
+
+      try {
+        let handle = state.dirHandle || (await getSavedDirHandle());
+
+        if (handle) {
+          try {
+            const perm = await handle.requestPermission({ mode: "readwrite" });
+            if (perm === "granted") {
+              state.dirHandle = handle;
+              state.useNativeFs = true;
+              await saveDirHandle(handle);
+              await readFromDirectoryHandle(handle);
+              updateAuthBtnStatus(true, handle.name);
+              showToast(`已成功授权【${handle.name}】，开启本地实时双向同步！`, "success");
+              return;
+            }
+          } catch (pe) {
+            console.warn("激活已存句柄失败，降级为重新选择:", pe);
+          }
+        }
+
+        handle = await window.showDirectoryPicker({ mode: "readwrite" });
+        state.dirHandle = handle;
+        state.useNativeFs = true;
+        await saveDirHandle(handle);
+        await readFromDirectoryHandle(handle);
+        updateAuthBtnStatus(true, handle.name);
+        showToast(`已成功授权【${handle.name}】，开启本地实时双向同步！`, "success");
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          console.error("授权失败:", err);
+          showToast("授权失败: " + err.message, "error");
+        }
+      }
+    }
+
+    async function readFromDirectoryHandle(dirHandle) {
+      const cards = [];
+      for (const col of COLUMNS_DEF) {
+        try {
+          const colHandle = await dirHandle.getDirectoryHandle(col.id, { create: true });
+          for await (const entry of colHandle.values()) {
+            if (entry.kind === "file" && entry.name.endsWith(".md")) {
+              const file = await entry.getFile();
+              const text = await file.text();
+              const card = parseMarkdownCard(entry.name, text, col.id, entry);
+              cards.push(card);
+            }
+          }
+        } catch (e) {
+          console.warn("读取列文件夹失败:", col.id, e);
+        }
+      }
+      state.cards = cards;
+      renderAll();
+    }
+
+    // --- 双模接入：优先直连本地微服务，失败则回退至浏览器沙箱模式 ---
+    async function initAppBackend() {
+      try {
+        const res = await fetch("/api/cards", { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          state.isServerMode = true;
+          state.serverVersion = data.version;
+          state.cards = data.cards || [];
+          if (data.path) {
+            const displayPath = data.path.endsWith("/") ? data.path : data.path + "/";
+            document.getElementById("boardPathBadge").innerText = displayPath.split("/").filter(Boolean).pop() + "/";
+            document.getElementById("boardPathBadge").parentElement.title = data.path;
+          }
+          updateAuthBtnForServerMode();
+          renderAll();
+          startServerWatchPoll();
+          console.log("🚀 已成功直连 Doska 本地微服务，启用零授权原生双向同步。");
+          return;
+        }
+      } catch (_) {
+        // 微服务未启动，进入单文件 File System 模式
+      }
+
+      state.isServerMode = false;
+      loadInitialData();
+      tryAutoRestoreHandle();
+    }
+
+    function updateAuthBtnForServerMode() {
+      const btn = document.getElementById("authSyncBtn");
+      const text = document.getElementById("authSyncText");
+      const icon = document.getElementById("authSyncIcon");
+      if (!btn) return;
+      btn.className = "flex items-center gap-1.5 h-7 px-2.5 rounded-sm border border-border bg-surface-2 text-xs font-medium text-text shadow-sm cursor-default";
+      btn.title = "已连接本地微服务：零授权、直接写回本地文件、全自动双向同步";
+      if (icon) {
+        icon.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+        icon.removeAttribute("data-lucide");
+      }
+      if (text) {
+        text.innerText = "本地微服务在线";
+      }
+    }
+
+    function startServerWatchPoll() {
+      setInterval(async () => {
+        if (!state.isServerMode || state.activeCardId || state.isEditingMode) return;
+        try {
+          const res = await fetch("/api/version", { cache: "no-store" });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.version && data.version !== state.serverVersion) {
+              state.serverVersion = data.version;
+              const cardsRes = await fetch("/api/cards", { cache: "no-store" });
+              if (cardsRes.ok) {
+                const cardsData = await cardsRes.json();
+                state.cards = cardsData.cards || [];
+                renderAll();
+                showToast("检测到外部卡片变更，已自动热同步");
+              }
+            }
+          }
+        } catch (_) {}
+      }, 1500);
+    }
+
+    // --- 初始数据基准 ---
+    async function loadInitialData() {
+      state.cards = [
+        {
+          id: "phase-96",
+          filename: "96-OCR 底座质量加固与架构技术债收敛.md",
+          column: "03_In_Progress",
+          title: "OCR 底座质量加固与架构技术债收敛",
+          priority: "high",
+          tags: ["phase", "ocr", "backend"],
+          created: "2026-09-13",
+          deadline: "",
+          body: `### 📌 任务概述\n阶段九十六：OCR 底座质量加固与架构技术债收敛 (P1) (进行中)\n\n### 📋 子任务清单 (Checklist)\n- [x] 96.1 依赖与私有路径治理 (Task 1 & Task 2)\n- [ ] 96.2 模型下载与就绪校验引入 SHA-256 强校验\n- [ ] 96.3 全局并发锁中毒 (PoisonError) 显式告警与自动恢复\n- [ ] 96.4 全异步推理与超时守护熔断机制\n- [ ] 96.5 边界用例与端到端高并发压测回归\n\n### 📝 开发记录与进度\n- *2026-09-13*：已完成 anyocr 路径治理与 Cargo 依赖收敛。`,
+          tasksTotal: 5,
+          tasksDone: 1
+        },
+        {
+          id: "phase-97",
+          filename: "97-高精度规则校验与企业高频特征扩展 (P0_P1).md",
+          column: "02_To_Do",
+          title: "高精度规则校验与企业高频特征扩展",
+          priority: "high",
+          tags: ["phase", "security", "rule"],
+          created: "2026-09-13",
+          deadline: "2026-09-25",
+          body: `### 📌 任务概述\n支持统一社会信用代码、银行卡号 Luhn 校验、军官证与护照高精度校验。\n\n### 📋 子任务清单 (Checklist)\n- [ ] 封装高精度校验算法\n- [ ] 正则与算法双模联动\n- [ ] 单元测试与真实脱敏校验`,
+          tasksTotal: 3,
+          tasksDone: 0
+        },
+        {
+          id: "phase-98",
+          filename: "98-脱敏策略多样化——硬抹除 (Redaction) 模式支持.md",
+          column: "02_To_Do",
+          title: "脱敏策略多样化——硬抹除模式支持",
+          priority: "medium",
+          tags: ["phase", "redaction"],
+          created: "2026-09-13",
+          deadline: "",
+          body: `### 📌 任务概述\n支持马赛克、黑色掩码、直接字符物理移除多种脱敏策略。\n\n### 📋 子任务清单 (Checklist)\n- [ ] 扩展脱敏模式枚举\n- [ ] 导出器各格式适配`,
+          tasksTotal: 2,
+          tasksDone: 0
+        },
+        {
+          id: "phase-13",
+          filename: "13-扫描件与图片型PDF的OCR像素级光栅化遮盖.md",
+          column: "01_Backlog",
+          title: "扫描件与图片型 PDF 的 OCR 像素级遮盖",
+          priority: "medium",
+          tags: ["ocr", "pdf", "vision"],
+          created: "2026-09-10",
+          deadline: "",
+          body: `### 📌 任务目标\n对于扫描件 PDF 进行 OCR 字符坐标定位与像素级光栅化打码遮盖。\n\n### 📋 子任务清单 (Checklist)\n- [ ] 探查 PDF Canvas 坐标系映射\n- [ ] 原生像素覆写引擎实现`,
+          tasksTotal: 2,
+          tasksDone: 0
+        },
+        {
+          id: "phase-95",
+          filename: "95-OCR 识别模型轻量化——切换至 PP-OCRv6_rec_small.md",
+          column: "04_Done",
+          title: "OCR 识别模型轻量化切换",
+          priority: "medium",
+          tags: ["phase", "ocr", "ai"],
+          created: "2026-09-13",
+          deadline: "",
+          body: `### 📌 任务概述\n切换至更轻量极速的文本识别模型。\n\n### 📋 子任务清单 (Checklist)\n- [x] 模型权重热替换\n- [x] 精度测试与内存基准达标`,
+          tasksTotal: 2,
+          tasksDone: 2
+        },
+        {
+          id: "phase-92",
+          filename: "92-纸质文档与表格 OCR 识别原生集成.md",
+          column: "04_Done",
+          title: "纸质文档与表格 OCR 识别原生集成",
+          priority: "high",
+          tags: ["phase", "ocr", "table"],
+          created: "2026-09-12",
+          deadline: "",
+          body: `### 📌 任务概述\n集成 PP-OCRv6 与 SLANet_plus 原生表格识别。\n\n### 📋 子任务清单 (Checklist)\n- [x] 表格结构识别与 HTML 转换\n- [x] 敏感词坐标反查映射`,
+          tasksTotal: 2,
+          tasksDone: 2
+        },
+        {
+          id: "card-01",
+          filename: "01-M1_AnyDoc文档解析引擎与Rust基座.md",
+          column: "04_Done",
+          title: "M1 AnyDoc 文档解析引擎与 Rust 基座",
+          priority: "high",
+          tags: ["backend", "parser", "core"],
+          created: "2026-09-01",
+          deadline: "",
+          body: `### 📌 任务目标\n构建 SensiDoc 底层核心框架，集成 anydoc 纯代码文档解析。\n\n### 📋 子任务清单 (Checklist)\n- [x] 基于 Rust / Cargo 搭建工程骨架\n- [x] 集成 anydoc 转换全格式`,
+          tasksTotal: 2,
+          tasksDone: 2
+        }
+      ];
+
+      renderAll();
+    }
+
+    // --- Markdown 卡片解析器 ---
+    function parseMarkdownCard(filename, content, column, fileHandle = null) {
+      let title = filename.replace(/\.md$/, "");
+      let priority = "medium";
+      let tags = [];
+      let deadline = "";
+      let created = "";
+      let id = "card-" + Math.random().toString(36).substr(2, 9);
+      let body = content;
+
+      const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
+      if (fmMatch) {
+        const fm = fmMatch[1];
+        body = fmMatch[2].trim();
+
+        const idMatch = fm.match(/id:\s*([^\r\n]+)/);
+        if (idMatch) id = idMatch[1].trim();
+
+        const titleMatch = fm.match(/title:\s*([^\r\n]+)/);
+        if (titleMatch) title = titleMatch[1].trim();
+
+        const prioMatch = fm.match(/priority:\s*([^\r\n]+)/);
+        if (prioMatch) priority = prioMatch[1].trim().toLowerCase();
+
+        const dlMatch = fm.match(/deadline:\s*([^\r\n]+)/);
+        if (dlMatch) deadline = dlMatch[1].trim();
+
+        const crMatch = fm.match(/created:\s*([^\r\n]+)/);
+        if (crMatch) created = crMatch[1].trim();
+
+        const tagsMatch = fm.match(/tags:\s*\[(.*?)\]/) || fm.match(/tags:\s*\n((?:\s*-\s*[^\r\n]+\r?\n?)+)/);
+        if (tagsMatch) {
+          if (tagsMatch[1].includes("-")) {
+            tags = tagsMatch[1].split("\n").map(l => l.replace(/^\s*-\s*/, "").trim()).filter(Boolean);
+          } else {
+            tags = tagsMatch[1].split(",").map(t => t.trim()).filter(Boolean);
+          }
+        }
+      }
+
+      const allTasks = (body.match(/^\s*-\s*\[[\sXx]\]/gm) || []).length;
+      const doneTasks = (body.match(/^\s*-\s*\[[Xx]\]/gm) || []).length;
+
+      return {
+        id,
+        filename,
+        column,
+        title,
+        priority,
+        tags,
+        deadline,
+        created,
+        body,
+        tasksTotal: allTasks,
+        tasksDone: doneTasks,
+        fileHandle
+      };
+    }
+
+    function serializeCardToMarkdown(card) {
+      const tagsStr = card.tags && card.tags.length ? `[${card.tags.join(", ")}]` : "[]";
+      const dlStr = card.deadline ? `deadline: ${card.deadline}\n` : "";
+      const crStr = card.created ? `created: ${card.created}\n` : `created: ${new Date().toISOString().split("T")[0]}\n`;
+      return `---
+id: ${card.id}
+title: ${card.title}
+priority: ${card.priority || "medium"}
+tags: ${tagsStr}
+${dlStr}${crStr}---
+
+${card.body.trim()}
+`;
+    }
+
+    function renderAll() {
+      updateStats();
+      renderDeck();
+      lucide.createIcons();
+    }
+
+    function updateStats() {
+      const total = state.cards.length;
+      const doneCards = state.cards.filter(c => c.column === "04_Done").length;
+      const inProgCards = state.cards.filter(c => c.column === "03_In_Progress").length;
+      const todoCards = state.cards.filter(c => c.column === "02_To_Do").length;
+
+      const pct = total > 0 ? Math.round((doneCards / total) * 100) : 0;
+      document.getElementById("topProgressBar").style.width = `${pct}%`;
+      document.getElementById("topProgressText").innerText = `${pct}%`;
+      document.getElementById("topProgressDetail").innerText = `(${doneCards}/${total})`;
+
+      document.getElementById("sidebarTotalCount").innerText = total;
+      document.getElementById("sidebarInProgressCount").innerText = inProgCards;
+      document.getElementById("sidebarTodoCount").innerText = todoCards;
+      document.getElementById("sidebarDoneCount").innerText = doneCards;
+
+      document.getElementById("prioHighCount").innerText = state.cards.filter(c => c.priority === "high").length;
+      document.getElementById("prioMedCount").innerText = state.cards.filter(c => c.priority === "medium").length;
+      document.getElementById("prioLowCount").innerText = state.cards.filter(c => c.priority === "low").length;
+
+      const tagSet = new Set();
+      state.cards.forEach(c => (c.tags || []).forEach(t => tagSet.add(t)));
+      const tagsContainer = document.getElementById("sidebarTagsList");
+      if (tagSet.size === 0) {
+        tagsContainer.innerHTML = `<span class="text-xs text-text-mute">暂无标签</span>`;
+      } else {
+        tagsContainer.innerHTML = Array.from(tagSet).map(tag => {
+          const isActive = state.filterTag === tag;
+          return `
+            <button 
+              class="text-[11px] px-2 py-0.5 rounded-sm border flex items-center gap-1 transition duration-120 ${isActive ? 'bg-accent text-bg font-medium border-accent' : 'bg-surface text-text-dim border-border hover:bg-surface-hover'}"
+              onclick="toggleTagFilter('${tag}')"
+            >
+              <i data-lucide="hash" class="w-2.5 h-2.5 text-text-mute"></i>
+              <span>${tag}</span>
+            </button>
+          `;
+        }).join("");
+      }
+    }
+
+    function toggleTagFilter(tag) {
+      state.filterTag = state.filterTag === tag ? null : tag;
+      renderAll();
+    }
+
+    // --- 渲染泳道 (Deck View - 结构以线区分，保持呼吸感) ---
+    function renderDeck() {
+      const container = document.getElementById("deckContainer");
+      container.innerHTML = "";
+
+      COLUMNS_DEF.forEach(col => {
+        let colCards = state.cards.filter(c => c.column === col.id);
+
+        if (state.filterView === "in_progress" && col.id !== "03_In_Progress") return;
+        if (state.filterView === "todo" && col.id !== "02_To_Do") return;
+        if (state.filterView === "done" && col.id !== "04_Done") return;
+
+        if (state.filterSearch) {
+          colCards = colCards.filter(c => 
+            c.title.toLowerCase().includes(state.filterSearch) || 
+            c.body.toLowerCase().includes(state.filterSearch) ||
+            (c.tags || []).some(t => t.toLowerCase().includes(state.filterSearch))
+          );
+        }
+
+        if (state.filterPriority) {
+          colCards = colCards.filter(c => c.priority === state.filterPriority);
+        }
+
+        if (state.filterTag) {
+          colCards = colCards.filter(c => (c.tags || []).includes(state.filterTag));
+        }
+
+        const colEl = document.createElement("div");
+        colEl.className = "w-80 shrink-0 bg-surface-2 border border-border rounded-md overflow-hidden flex flex-col max-h-full transition duration-120";
+        colEl.dataset.colId = col.id;
+
+        colEl.innerHTML = `
+          <div class="p-3 border-b border-border flex items-center justify-between shrink-0 bg-surface rounded-t-md">
+            <div class="flex items-center gap-2">
+              <i data-lucide="${col.icon}" class="w-3.5 h-3.5 text-text-dim"></i>
+              <span class="font-semibold text-xs text-text tracking-wide">${col.title}</span>
+              <span class="text-[11px] font-mono tabular-nums px-1.5 py-0.2 rounded-sm bg-surface-2 text-text-mute border border-border">${colCards.length}</span>
+            </div>
+            <button class="w-6 h-6 rounded-sm text-text-mute hover:text-text hover:bg-surface-hover flex items-center justify-center transition duration-120" title="在此列新建卡片" onclick="openNewModal('${col.id}')">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+          <div class="col-cards-dropzone flex-1 p-2 space-y-2 overflow-y-auto min-h-[160px]"></div>
+        `;
+
+        const dropzone = colEl.querySelector(".col-cards-dropzone");
+
+        dropzone.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          colEl.classList.add("drag-over-col");
+        });
+        dropzone.addEventListener("dragleave", () => {
+          colEl.classList.remove("drag-over-col");
+        });
+        dropzone.addEventListener("drop", async (e) => {
+          e.preventDefault();
+          colEl.classList.remove("drag-over-col");
+          const cardId = e.dataTransfer.getData("text/plain");
+          if (cardId) {
+            await moveCardToColumn(cardId, col.id);
+          }
+        });
+
+        colCards.forEach(card => {
+          const cardEl = createCardElement(card);
+          dropzone.appendChild(cardEl);
+        });
+
+        container.appendChild(colEl);
+      });
+
+      lucide.createIcons();
+    }
+
+    // --- 单张卡片构建 (Geist-Neutral: 统一 1px 细线边框、中性底色、克制色彩) ---
+    function createCardElement(card) {
+      const el = document.createElement("div");
+      el.className = "group relative bg-surface border border-border hover:border-border-strong rounded-sm p-3 cursor-pointer shadow-sm hover:shadow-md transition-all duration-120 active:scale-[0.99]";
+      el.draggable = true;
+      el.dataset.cardId = card.id;
+
+      // 优先级 Badge (严格遵守极简规范，使用中性或克制语义色)
+      let prioBadge = "";
+      if (card.priority === "high") {
+        prioBadge = `<span class="inline-flex items-center gap-1 text-[10px] font-medium text-danger bg-danger-soft border border-danger/20 px-1.5 py-0.5 rounded-sm"><i data-lucide="alert-circle" class="w-2.5 h-2.5"></i>High</span>`;
+      } else if (card.priority === "medium") {
+        prioBadge = `<span class="inline-flex items-center gap-1 text-[10px] font-medium text-text-dim bg-surface-2 border border-border px-1.5 py-0.5 rounded-sm"><i data-lucide="arrow-up-right" class="w-2.5 h-2.5"></i>Med</span>`;
+      } else {
+        prioBadge = `<span class="inline-flex items-center gap-1 text-[10px] font-medium text-text-mute bg-surface-2 border border-border px-1.5 py-0.5 rounded-sm"><i data-lucide="arrow-down" class="w-2.5 h-2.5"></i>Low</span>`;
+      }
+
+      // 截止日期
+      const deadlineBadge = card.deadline 
+        ? `<span class="inline-flex items-center gap-1 text-[10px] text-text-mute bg-surface-2 px-1.5 py-0.5 rounded-sm border border-border tabular-nums font-mono"><i data-lucide="calendar" class="w-2.5 h-2.5"></i>${card.deadline}</span>` 
+        : "";
+
+      // 标签 Chips
+      const tagsBadges = (card.tags || []).map(t => 
+        `<span class="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.2 rounded-sm bg-surface-2 text-text-mute border border-border"><i data-lucide="hash" class="w-2.5 h-2.5 text-text-mute"></i>${t}</span>`
+      ).join(" ");
+
+      // Checklist 任务进度条
+      let taskProgressHtml = "";
+      if (card.tasksTotal > 0) {
+        const pct = Math.round((card.tasksDone / card.tasksTotal) * 100);
+        const isDone = card.tasksDone === card.tasksTotal;
+        taskProgressHtml = `
+          <div class="mt-2.5 pt-2 border-t border-border flex items-center justify-between text-[11px] tabular-nums font-mono">
+            <div class="flex items-center gap-1.5">
+              <i data-lucide="${isDone ? 'check-check' : 'list-checks'}" class="w-3.5 h-3.5 ${isDone ? 'text-text' : 'text-text-mute'}"></i>
+              <span class="${isDone ? 'text-text font-medium' : 'text-text-mute'}">${card.tasksDone}/${card.tasksTotal}</span>
+            </div>
+            <div class="w-16 h-1 bg-border rounded-full overflow-hidden">
+              <div class="h-full rounded-full transition-all ${isDone ? 'bg-text' : 'bg-text-dim'}" style="width: ${pct}%"></div>
+            </div>
+          </div>
+        `;
+      }
+
+      el.innerHTML = `
+        <div class="flex items-center justify-between gap-2 mb-1.5">
+          <div class="flex items-center gap-1.5">
+            ${prioBadge}
+            ${deadlineBadge}
+          </div>
+          <i data-lucide="grip-vertical" class="w-3 h-3 text-text-mute opacity-40 group-hover:opacity-100 transition duration-120 shrink-0"></i>
+        </div>
+
+        <h4 class="font-medium text-xs text-text leading-snug group-hover:text-primary mb-2 transition duration-120">
+          ${card.title}
+        </h4>
+
+        ${card.tags && card.tags.length ? `<div class="flex flex-wrap gap-1">${tagsBadges}</div>` : ""}
+
+        ${taskProgressHtml}
+      `;
+
+      el.addEventListener("dragstart", (e) => {
+        el.classList.add("card-ghost");
+        e.dataTransfer.setData("text/plain", card.id);
+      });
+      el.addEventListener("dragend", () => {
+        el.classList.remove("card-ghost");
+      });
+
+      el.addEventListener("click", () => {
+        openDrawer(card.id);
+      });
+
+      return el;
+    }
+
+    // --- 拖拽流转 ---
+    async function moveCardToColumn(cardId, targetColId) {
+      const card = state.cards.find(c => c.id === cardId);
+      if (!card || card.column === targetColId) return;
+
+      const oldCol = card.column;
+      card.column = targetColId;
+
+      if (state.isServerMode) {
+        try {
+          await fetch("/api/move", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              cardId: card.id,
+              filename: card.filename,
+              fromCol: oldCol,
+              toCol: targetColId
+            }),
+          });
+          showToast(`已流转至 ${targetColId}`);
+        } catch (err) {
+          console.error("服务端流转失败:", err);
+        }
+        renderAll();
+        return;
+      }
+
+      if (state.dirHandle && card.filename) {
+        try {
+          const oldColHandle = await state.dirHandle.getDirectoryHandle(oldCol);
+          const targetColHandle = await state.dirHandle.getDirectoryHandle(targetColId, { create: true });
+          
+          const oldFileHandle = await oldColHandle.getFileHandle(card.filename);
+          const file = await oldFileHandle.getFile();
+          const content = await file.text();
+
+          const newFileHandle = await targetColHandle.getFileHandle(card.filename, { create: true });
+          const writable = await newFileHandle.createWritable();
+          await writable.write(content);
+          await writable.close();
+
+          await oldColHandle.removeEntry(card.filename);
+          card.fileHandle = newFileHandle;
+          console.log(`✅ 本地文件已流转: ${oldCol}/${card.filename} ➔ ${targetColId}/${card.filename}`);
+        } catch (err) {
+          console.error("流转本地文件失败:", err);
+        }
+      }
+
+      renderAll();
+    }
+
+    // --- 抽屉与居中大模态交互体系 ---
+    function toggleDrawerModalMode() {
+      state.isDrawerModalMode = !state.isDrawerModalMode;
+      localStorage.setItem("doska_card_drawer_modal", state.isDrawerModalMode);
+      applyDrawerModalMode();
+    }
+
+    function applyDrawerModalMode() {
+      const drawer = document.getElementById("cardDrawer");
+      const expandIcon = document.getElementById("drawerExpandIcon");
+      const expandBtn = document.getElementById("drawerExpandBtn");
+
+      if (state.isDrawerModalMode) {
+        drawer.classList.add("drawer-mode-modal");
+        if (expandIcon) expandIcon.setAttribute("data-lucide", "minimize-2");
+        if (expandBtn) expandBtn.setAttribute("title", "恢复为右侧抽屉视图 (双击顶栏也可切换)");
+      } else {
+        drawer.classList.remove("drawer-mode-modal");
+        if (expandIcon) expandIcon.setAttribute("data-lucide", "maximize-2");
+        if (expandBtn) expandBtn.setAttribute("title", "切换为居中宽屏大模态 (双击顶栏也可切换)");
+      }
+      lucide.createIcons();
+    }
+
+    function openDrawer(cardId) {
+      const card = state.cards.find(c => c.id === cardId);
+      if (!card) return;
+
+      state.activeCardId = cardId;
+      state.isEditingMode = false;
+
+      document.getElementById("drawerColName").innerText = card.column;
+      document.getElementById("drawerTitleInput").value = card.title;
+      document.getElementById("drawerColSelect").value = card.column;
+      document.getElementById("drawerPrioSelect").value = card.priority || "medium";
+      document.getElementById("drawerDeadInput").value = card.deadline || "";
+      document.getElementById("drawerTagsInput").value = (card.tags || []).join(", ");
+      document.getElementById("drawerBodyEditor").value = card.body;
+
+      applyDrawerModalMode();
+      updateDrawerModeDisplay();
+      renderDrawerPreview(card);
+
+      document.getElementById("drawerOverlay").classList.remove("hidden");
+      document.getElementById("cardDrawer").classList.remove("translate-x-full");
+      lucide.createIcons();
+    }
+
+    function closeDrawer() {
+      document.getElementById("cardDrawer").classList.add("translate-x-full");
+      document.getElementById("drawerOverlay").classList.add("hidden");
+      state.activeCardId = null;
+    }
+
+    function updateDrawerModeDisplay() {
+      const isEdit = state.isEditingMode;
+      const previewPane = document.getElementById("drawerPreviewPane");
+      const editor = document.getElementById("drawerBodyEditor");
+      const modeText = document.getElementById("drawerModeText");
+      const modeIcon = document.getElementById("drawerModeIcon");
+
+      if (isEdit) {
+        previewPane.classList.add("hidden");
+        editor.classList.remove("hidden");
+        modeText.innerText = "预览渲染";
+        modeIcon.setAttribute("data-lucide", "eye");
+        editor.focus();
+      } else {
+        editor.classList.add("hidden");
+        previewPane.classList.remove("hidden");
+        modeText.innerText = "编辑源码";
+        modeIcon.setAttribute("data-lucide", "code-2");
+        const card = state.cards.find(c => c.id === state.activeCardId);
+        if (card) {
+          card.body = editor.value;
+          renderDrawerPreview(card);
+        }
+      }
+      lucide.createIcons();
+    }
+
+    function renderDrawerPreview(card) {
+      const container = document.getElementById("drawerPreviewPane");
+      // 智能去重：若正文第一行带大标题 (# 标题)，过滤掉该行避免与顶部大标题输入框视觉冲突
+      const cleanBody = (card.body || "").replace(/^#\s+[^\r\n]*\r?\n+/m, "");
+      const rawHtml = marked.parse(cleanBody);
+      container.innerHTML = rawHtml;
+
+      const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+      checkboxes.forEach((cb, index) => {
+        cb.disabled = false;
+        cb.className = "w-3.5 h-3.5 rounded-sm text-text focus:ring-primary border-border-strong bg-surface cursor-pointer";
+        
+        const parentLi = cb.closest("li");
+        if (parentLi) {
+          if (cb.checked) {
+            parentLi.classList.add("is-done");
+          } else {
+            parentLi.classList.remove("is-done");
+          }
+        }
+
+        cb.addEventListener("change", async (e) => {
+          if (parentLi) {
+            parentLi.classList.toggle("is-done", e.target.checked);
+          }
+          await toggleChecklistInCard(card, index, e.target.checked);
+        });
+      });
+    }
+
+    async function toggleChecklistInCard(card, taskIndex, isChecked) {
+      let currentIndex = 0;
+      card.body = card.body.replace(/^(\s*-\s*\[)([\sXx])(\])/gm, (match, prefix, val, suffix) => {
+        if (currentIndex === taskIndex) {
+          currentIndex++;
+          return `${prefix}${isChecked ? 'x' : ' '}${suffix}`;
+        }
+        currentIndex++;
+        return match;
+      });
+
+      card.tasksTotal = (card.body.match(/^\s*-\s*\[[\sXx]\]/gm) || []).length;
+      card.tasksDone = (card.body.match(/^\s*-\s*\[[Xx]\]/gm) || []).length;
+
+      document.getElementById("drawerBodyEditor").value = card.body;
+      document.getElementById("drawerSaveTime").innerText = `已在 ${new Date().toLocaleTimeString()} 自动写回`;
+
+      await persistCardToFile(card);
+      renderAll();
+    }
+
+    async function saveActiveCard() {
+      const card = state.cards.find(c => c.id === state.activeCardId);
+      if (!card) return;
+
+      const oldCol = card.column;
+      const newCol = document.getElementById("drawerColSelect").value;
+
+      card.title = document.getElementById("drawerTitleInput").value.trim() || card.title;
+      card.priority = document.getElementById("drawerPrioSelect").value;
+      card.deadline = document.getElementById("drawerDeadInput").value;
+      card.tags = document.getElementById("drawerTagsInput").value.split(",").map(t => t.trim()).filter(Boolean);
+      card.body = document.getElementById("drawerBodyEditor").value;
+
+      card.tasksTotal = (card.body.match(/^\s*-\s*\[[\sXx]\]/gm) || []).length;
+      card.tasksDone = (card.body.match(/^\s*-\s*\[[Xx]\]/gm) || []).length;
+
+      if (oldCol !== newCol) {
+        await moveCardToColumn(card.id, newCol);
+      } else {
+        await persistCardToFile(card);
+      }
+
+      document.getElementById("drawerSaveTime").innerText = `已在 ${new Date().toLocaleTimeString()} 保存`;
+      renderAll();
+      closeDrawer();
+    }
+
+    async function persistCardToFile(card) {
+      if (state.isServerMode) {
+        try {
+          await fetch("/api/card", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(card),
+          });
+        } catch (e) {
+          console.error("服务端写入本地卡片失败:", e);
+        }
+        return;
+      }
+
+      if (state.dirHandle && card.filename) {
+        try {
+          const colHandle = await state.dirHandle.getDirectoryHandle(card.column, { create: true });
+          const fileHandle = await colHandle.getFileHandle(card.filename, { create: true });
+          const writable = await fileHandle.createWritable();
+          const content = serializeCardToMarkdown(card);
+          await writable.write(content);
+          await writable.close();
+        } catch (e) {
+          console.error("写入本地卡片失败:", e);
+        }
+      }
+    }
+
+    async function deleteActiveCard() {
+      if (!confirm("确定将此卡片移动到废纸篓 (_trash) 吗？")) return;
+      const card = state.cards.find(c => c.id === state.activeCardId);
+      if (!card) return;
+
+      if (state.isServerMode) {
+        try {
+          await fetch("/api/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              filename: card.filename,
+              column: card.column
+            }),
+          });
+          state.cards = state.cards.filter(c => c.id !== card.id);
+          closeDrawer();
+          renderAll();
+          showToast("卡片已移至废纸篓");
+        } catch (e) {
+          console.error("服务端删除失败:", e);
+        }
+        return;
+      }
+
+      if (state.dirHandle && card.filename) {
+        try {
+          const colHandle = await state.dirHandle.getDirectoryHandle(card.column);
+          const trashHandle = await state.dirHandle.getDirectoryHandle("_trash", { create: true });
+          
+          const fileHandle = await colHandle.getFileHandle(card.filename);
+          const file = await fileHandle.getFile();
+          const content = await file.text();
+
+          const trashFile = await trashHandle.getFileHandle(card.filename, { create: true });
+          const writable = await trashFile.createWritable();
+          await writable.write(content);
+          await writable.close();
+
+          await colHandle.removeEntry(card.filename);
+        } catch (e) {
+          console.error("移至废纸篓失败:", e);
+        }
+      }
+
+      state.cards = state.cards.filter(c => c.id !== card.id);
+      closeDrawer();
+      renderAll();
+    }
+
+    // --- 新建模态框 ---
+    function openNewModal(colId = "02_To_Do") {
+      document.getElementById("newCardCol").value = colId;
+      document.getElementById("newCardTitle").value = "";
+      document.getElementById("newCardDesc").value = "";
+      document.getElementById("newCardModal").classList.remove("hidden");
+      document.getElementById("newCardTitle").focus();
+      lucide.createIcons();
+    }
+
+    function closeNewModal() {
+      document.getElementById("newCardModal").classList.add("hidden");
+    }
+
+    async function submitNewCard() {
+      const title = document.getElementById("newCardTitle").value.trim();
+      if (!title) {
+        alert("请输入卡片标题");
+        return;
+      }
+
+      const col = document.getElementById("newCardCol").value;
+      const prio = document.getElementById("newCardPrio").value;
+      const desc = document.getElementById("newCardDesc").value.trim() || "待补充任务目标说明";
+
+      const safeName = title.replace(/[\\/*?:"<>|]/g, "").trim() + ".md";
+      const today = new Date().toISOString().split("T")[0];
+
+      const newCard = {
+        id: "card-" + Math.random().toString(36).substr(2, 9),
+        filename: safeName,
+        column: col,
+        title: title,
+        priority: prio,
+        tags: ["feature"],
+        created: today,
+        deadline: "",
+        body: `### 📌 任务目标\n${desc}\n\n### 📋 子任务清单 (Checklist)\n- [ ] 核心功能设计与编码\n- [ ] 单元测试与用例覆盖\n- [ ] 联调与文档补充\n\n### 📝 开发记录\n- *${today}*：创建任务卡片。`,
+        tasksTotal: 3,
+        tasksDone: 0
+      };
+
+      state.cards.push(newCard);
+      await persistCardToFile(newCard);
+
+      closeNewModal();
+      renderAll();
+    }
+  </script>
+</body>
+</html>

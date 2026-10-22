@@ -105,6 +105,11 @@ func setAPIKey(k string) error {
 // Accepts: "Authorization: Bearer xxx" (OpenAI SDK default) or "x-api-key: xxx".
 func requireAPIKey(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// 跨域 OPTIONS 预检请求不携带凭据，放行给下游 handleOptions 响应 CORS 头
+		if r.Method == "OPTIONS" {
+			next(w, r)
+			return
+		}
 		key := getAPIKey()
 		if key == "" {
 			next(w, r)
